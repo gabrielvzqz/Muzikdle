@@ -1,0 +1,243 @@
+/* === ESTILOS ESPECÍFICOS PARA HISTORIAL === */
+
+/* Contenedor principal */
+.historial-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Header del historial */
+.historial-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.historial-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--color-text), var(--color-text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.historial-header p {
+    color: var(--color-text-secondary);
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Grid de botones */
+.botones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+/* Botones de día */
+.btn-dia {
+    padding: 1.5rem 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+}
+
+.btn-dia:hover {
+    background: var(--color-tertiary);
+    border-color: var(--color-accent);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.btn-dia:active {
+    transform: translateY(-1px);
+}
+
+.btn-dia.actual {
+    background: var(--color-accent);
+    border-color: var(--color-accent-light);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-dia.actual:hover {
+    background: var(--color-accent-light);
+}
+
+.btn-dia.seleccionado {
+    border-color: var(--color-accent);
+    border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.numero-dia {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.texto-dia {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+/* Información del álbum */
+/*.album-info {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 2rem;
+    display: none;
+}*/
+
+.album-info.mostrar {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.album-info h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-text);
+}
+
+.album-info p {
+    color: var(--color-text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+/* Botón jugar específico para historial */
+/*.btn-jugar-historial {
+    margin-top: 1.5rem;
+    padding: 12px 30px;
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}*/
+
+.btn-jugar-historial:hover {
+    background: var(--color-accent-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Estado de carga específico */
+.cargando-historial {
+    text-align: center;
+    padding: 4rem;
+}
+
+.cargando-historial .spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid var(--color-border);
+    border-top: 3px solid var(--color-accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+/* Sin álbumes */
+.sin-albumes {
+    text-align: center;
+    padding: 4rem;
+    color: var(--color-text-muted);
+    display: none;
+}
+
+.sin-albumes p {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Footer específico para historial */
+.historial-footer {
+    text-align: center;
+    margin-top: 40px;
+    color: var(--color-text-secondary);
+    padding: 20px;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+    .historial-container {
+        padding: 1rem;
+    }
+
+    .historial-header h1 {
+        font-size: 2rem;
+    }
+
+    .botones-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .btn-dia {
+        min-height: 85px;
+        padding: 1rem 0.5rem;
+    }
+
+    .numero-dia {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .botones-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.btn-dia {
+    cursor: pointer;
+}
+
+.btn-dia:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* Haz los botones un poco más grandes para mejor UX */
+.btn-dia {
+    min-height: 110px;
+    padding: 1.75rem 0.5rem;
+}
+
+.numero-dia {
+    font-size: 2.2rem;
+}

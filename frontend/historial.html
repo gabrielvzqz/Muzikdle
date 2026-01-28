@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Álbumes</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/historial.css">
+</head>
+
+<body>
+    <!-- Navbar consistente -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">Álbum del Día</a>
+            <a href="index.html" class="btn-volver">← Volver al Juego</a>
+        </div>
+    </nav>
+
+    <div class="historial-container">
+        <header class="historial-header">
+            <h1>Historial de Álbumes</h1>
+            <p>Selecciona cualquier día para jugar</p>
+        </header>
+
+        <main>
+            <!-- Estado de carga -->
+            <div class="cargando-historial" id="cargando">
+                <div class="spinner"></div>
+                <p>Cargando álbumes...</p>
+            </div>
+
+            <!-- Grid de botones -->
+            <div class="botones-grid" id="botones-grid">
+                <!-- Los botones se generarán con JavaScript -->
+            </div>
+            <!--
+            <div class="album-info" id="album-info">
+                <h3 id="album-titulo">Álbum #1</h3>
+                <p id="album-fecha">Fecha: 15 de enero de 2024</p>
+                <p id="album-descripcion">Selecciona un álbum para ver más detalles</p>
+                <button class="btn-jugar-historial" id="btn-jugar-historial">
+                    🎮 Jugar a este álbum
+                </button>
+            </div>-->
+
+
+            <!-- Sin álbumes -->
+            <div class="sin-albumes" id="sin-albumes">
+                <p>No hay álbumes disponibles en el historial.</p>
+                <a href="index.html" class="btn-volver">← Volver al inicio</a>
+            </div>
+        </main>
+
+        <footer class="historial-footer">
+            <p>© 2024 Álbum del Día - Historial</p>
+        </footer>
+    </div>
+
+    <script src="js/historial.js"></script>
+</body>
+
+</html>
