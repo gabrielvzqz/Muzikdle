@@ -7,14 +7,16 @@
     <title>Historial de Álbumes</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/historial.css">
+
 </head>
 
 <body>
     <!-- Navbar consistente -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="index.html" class="nav-logo">Álbum del Día</a>
-            <a href="index.html" class="btn-volver">← Volver al Juego</a>
+            <a href="index.html" class="nav-logo">
+                <img src="..\uploads\logo1.jpg" alt="Álbum del Día" class="logo-img">
+            </a>
         </div>
     </nav>
 
@@ -54,10 +56,25 @@
         </main>
 
         <footer class="historial-footer">
-            <p>© 2024 Álbum del Día - Historial</p>
+            <p>© 2026 Muzikdle</p>
         </footer>
     </div>
+    <script>
+        // Solo en historial.html - Centrar el logo
+        document.addEventListener('DOMContentLoaded', function () {
+            const navContainer = document.querySelector('.nav-container');
+            if (navContainer && window.location.pathname.includes('historial')) {
+                navContainer.style.justifyContent = 'center';
+                navContainer.style.width = '100%';
 
+                // Ocultar menú hamburguesa
+                const menuHamburguesa = document.querySelector('.menu-hamburguesa');
+                if (menuHamburguesa) {
+                    menuHamburguesa.style.display = 'none';
+                }
+            }
+        });
+    </script>
     <script src="js/historial.js"></script>
 </body>
 

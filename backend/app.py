@@ -1,12 +1,15 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from config import Config
 from models import ImagenModel
+import uuid
 
 app = Flask(__name__)
+app.secret_key = 'clave_secreta_para_desarrollo' 
+
 CORS(app, resources={
     r"/api/*": {
         "origins": [
@@ -26,6 +29,14 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Instancia del modelo
 imagen_model = ImagenModel()
+
+def get_or_create_user_id():
+    """Genera o recupera un ID único para el usuario"""
+    if 'user_id' not in session:
+        # Generar ID único
+        session['user_id'] = str(uuid.uuid4())[:12]  # ID más corto
+        session['first_visit'] = datetime.now().isoformat()
+    return session['user_id']
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -473,5 +484,335 @@ def get_album_por_fecha(fecha):
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
+
+# Ruta para registrar intento por álbum específico
+@app.route('/api/registrar-intento-album', methods=['POST'])
+def registrar_intento_album():
+    try:
+        data = request.get_json()
+        user_id = get_or_create_user_id()
+        
+        fecha_album = data.get('fecha_album')
+        numero_album = data.get('numero_album')
+        acierto = data.get('acierto', False)
+        intentos_usuario = data.get('intentos', 1)
+        
+        if not fecha_album or not numero_album:
+            return jsonify({
+                'success': False,
+                'message': 'Se requiere fecha_album y numero_album'
+            }), 400
+        
+        # Calcular intentos a guardar
+        if acierto:
+            intentos_guardar = min(int(intentos_usuario), 5)  # 1-5 si acertó
+        else:
+            intentos_guardar = 6  # 6 si falló
+        
+        from database import Database
+        db = Database()
+        db.connect()
+        cursor = db.connection.cursor()
+        
+        # Verificar si es la PRIMERA vez que juega este álbum
+        cursor.execute('''
+            SELECT veces_jugado 
+            FROM intentos_usuario_album 
+            WHERE user_id_hash = MD5(%s) 
+              AND fecha_album = %s 
+              AND numero_album = %s
+        ''', (user_id, fecha_album, int(numero_album)))
+        
+        resultado = cursor.fetchone()
+        
+        es_primera_vez = False
+        veces_jugado = 1
+        
+        if resultado:
+            # Ya ha jugado antes - NO actualizar estadísticas
+            veces_jugado = resultado[0] + 1
+            es_primera_vez = False
+            
+            cursor.execute('''
+                UPDATE intentos_usuario_album 
+                SET veces_jugado = veces_jugado + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id_hash = MD5(%s) 
+                  AND fecha_album = %s 
+                  AND numero_album = %s
+            ''', (user_id, fecha_album, numero_album))
+            
+        else:
+            # Es primera vez - SÍ actualizar estadísticas
+            veces_jugado = 1
+            es_primera_vez = True
+            
+            # Insertar registro del usuario
+            cursor.execute('''
+                INSERT INTO intentos_usuario_album 
+                (user_id_hash, fecha_album, numero_album, acierto, intentos_necesarios, veces_jugado)
+                VALUES (MD5(%s), %s, %s, %s, %s, 1)
+            ''', (user_id, fecha_album, numero_album, acierto, intentos_guardar))
+            
+            # Actualizar estadísticas del álbum SOLO si es acierto
+            if acierto:
+                # Construir la consulta dinámicamente según el intento
+                columna_intento = f"aciertos_intento_{intentos_guardar}"
+                
+                cursor.execute(f'''
+                    INSERT INTO estadisticas_album 
+                    (fecha_album, numero_album, total_jugadores, aciertos, fallos, total_intentos, {columna_intento})
+                    VALUES (%s, %s, 1, 1, 0, %s, 1)
+                    ON DUPLICATE KEY UPDATE
+                        total_jugadores = total_jugadores + 1,
+                        aciertos = aciertos + 1,
+                        {columna_intento} = {columna_intento} + 1,
+                        total_intentos = total_intentos + %s
+                ''', (fecha_album, numero_album, intentos_guardar, intentos_guardar))
+            else:
+                # Si es fallo
+                cursor.execute('''
+                    INSERT INTO estadisticas_album 
+                    (fecha_album, numero_album, total_jugadores, aciertos, fallos, total_intentos)
+                    VALUES (%s, %s, 1, 0, 1, %s)
+                    ON DUPLICATE KEY UPDATE
+                        total_jugadores = total_jugadores + 1,
+                        fallos = fallos + 1,
+                        total_intentos = total_intentos + %s
+                ''', (fecha_album, numero_album, intentos_guardar, intentos_guardar))
+        
+        # Obtener estadísticas COMPLETAS del álbum
+        cursor.execute('''
+            SELECT 
+                total_jugadores,
+                aciertos,
+                fallos,
+                total_intentos,
+                aciertos_intento_1,
+                aciertos_intento_2,
+                aciertos_intento_3,
+                aciertos_intento_4,
+                aciertos_intento_5
+            FROM estadisticas_album 
+            WHERE fecha_album = %s AND numero_album = %s
+        ''', (fecha_album, int(numero_album)))
+        
+        stats = cursor.fetchone()
+        
+        # Calcular porcentaje y distribuciones
+        porcentaje_acierto = 0
+        if stats and stats[0] and stats[0] > 0:
+            porcentaje_acierto = (stats[1] / stats[0]) * 100 if stats[1] else 0
+        
+        # Crear objeto con estadísticas detalladas
+        estadisticas_detalladas = {
+            'total_jugadores': stats[0] if stats and stats[0] else 0,
+            'aciertos': stats[1] if stats and stats[1] else 0,
+            'fallos': stats[2] if stats and stats[2] else 0,
+            'total_intentos': stats[3] if stats and stats[3] else 0,
+            'porcentaje_acierto': round(porcentaje_acierto, 1),
+            'distribucion_aciertos': {
+                'intento_1': stats[4] if stats and len(stats) > 4 and stats[4] else 0,
+                'intento_2': stats[5] if stats and len(stats) > 5 and stats[5] else 0,
+                'intento_3': stats[6] if stats and len(stats) > 6 and stats[6] else 0,
+                'intento_4': stats[7] if stats and len(stats) > 7 and stats[7] else 0,
+                'intento_5': stats[8] if stats and len(stats) > 8 and stats[8] else 0
+            }
+        }
+        
+        db.connection.commit()
+        cursor.close()
+        db.connection.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Intento registrado',
+            'es_primera_vez': es_primera_vez,
+            'veces_jugado': veces_jugado,
+            'estadisticas': estadisticas_detalladas
+        })
+        
+    except Exception as e:
+        print(f"Error registrar intento álbum: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+        
+# Ruta para obtener estadísticas de UN álbum específico
+@app.route('/api/estadisticas-album', methods=['GET'])
+def get_estadisticas_album():
+    try:
+        fecha_album = request.args.get('fecha')
+        numero_album = request.args.get('numero')
+        
+        if not fecha_album or not numero_album:
+            return jsonify({
+                'success': False,
+                'message': 'Se requiere fecha y número del álbum'
+            }), 400
+        
+        from database import Database
+        db = Database()
+        db.connect()
+        cursor = db.connection.cursor(dictionary=True)
+        
+        # Obtener estadísticas completas
+        cursor.execute('''
+            SELECT 
+                total_jugadores,
+                aciertos,
+                fallos,
+                total_intentos,
+                COALESCE(aciertos_intento_1, 0) as aciertos_intento_1,
+                COALESCE(aciertos_intento_2, 0) as aciertos_intento_2,
+                COALESCE(aciertos_intento_3, 0) as aciertos_intento_3,
+                COALESCE(aciertos_intento_4, 0) as aciertos_intento_4,
+                COALESCE(aciertos_intento_5, 0) as aciertos_intento_5
+            FROM estadisticas_album 
+            WHERE fecha_album = %s AND numero_album = %s
+        ''', (fecha_album, int(numero_album)))
+        
+        stats = cursor.fetchone()
+        
+        if not stats:
+            stats = {
+                'total_jugadores': 0,
+                'aciertos': 0,
+                'fallos': 0,
+                'total_intentos': 0,
+                'aciertos_intento_1': 0,
+                'aciertos_intento_2': 0,
+                'aciertos_intento_3': 0,
+                'aciertos_intento_4': 0,
+                'aciertos_intento_5': 0
+            }
+        
+        # Calcular porcentaje
+        porcentaje_acierto = 0
+        if stats['total_jugadores'] > 0:
+            porcentaje_acierto = (stats['aciertos'] / stats['total_jugadores']) * 100
+        
+        cursor.close()
+        db.connection.close()
+        
+        return jsonify({
+            'success': True,
+            'fecha_album': fecha_album,
+            'numero_album': numero_album,
+            'estadisticas': {
+                'total_jugadores': stats['total_jugadores'],
+                'aciertos': stats['aciertos'],
+                'fallos': stats['fallos'],
+                'total_intentos': stats['total_intentos'],
+                'porcentaje_acierto': round(porcentaje_acierto, 1),
+                'distribucion_aciertos': {
+                    'intento_1': stats['aciertos_intento_1'],
+                    'intento_2': stats['aciertos_intento_2'],
+                    'intento_3': stats['aciertos_intento_3'],
+                    'intento_4': stats['aciertos_intento_4'],
+                    'intento_5': stats['aciertos_intento_5']
+                }
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error estadísticas álbum: {str(e)}")
+        return jsonify({
+            'success': True,
+            'fecha_album': fecha_album,
+            'numero_album': numero_album,
+            'estadisticas': {
+                'total_jugadores': 0,
+                'aciertos': 0,
+                'fallos': 0,
+                'total_intentos': 0,
+                'porcentaje_acierto': 0,
+                'distribucion_aciertos': {
+                    'intento_1': 0,
+                    'intento_2': 0,
+                    'intento_3': 0,
+                    'intento_4': 0,
+                    'intento_5': 0
+                }
+            }
+        })
+
+# Ruta para ver si el usuario YA jugó este álbum específico
+@app.route('/api/mi-intento-album', methods=['GET'])
+def get_mi_intento_album():
+    try:
+        user_id = get_or_create_user_id()
+        fecha_album = request.args.get('fecha')
+        numero_album = request.args.get('numero')
+        
+        if not fecha_album or not numero_album:
+            return jsonify({
+                'success': False,
+                'message': 'Se requiere fecha y número del álbum'
+            }), 400
+        
+        from database import Database
+        db = Database()
+        db.connect()
+        cursor = db.connection.cursor(dictionary=True)
+        
+        cursor.execute('''
+            SELECT 
+                acierto,
+                intentos_necesarios,
+                veces_jugado,
+                es_primera_vez,
+                created_at,
+                updated_at
+            FROM intentos_usuario_album 
+            WHERE user_id_hash = MD5(%s) 
+              AND fecha_album = %s 
+              AND numero_album = %s
+        ''', (user_id, fecha_album, int(numero_album)))
+        
+        mi_intento = cursor.fetchone()
+        
+        cursor.close()
+        db.connection.close()
+        
+        if mi_intento:
+            # Formatear intentos para mostrar
+            if mi_intento['acierto']:
+                texto_intentos = f"en {mi_intento['intentos_necesarios']} intento{'s' if mi_intento['intentos_necesarios'] > 1 else ''}"
+            else:
+                texto_intentos = "no acertaste"
+            
+            return jsonify({
+                'success': True,
+                'ya_jugo': True,
+                'veces_jugado': mi_intento['veces_jugado'],
+                'es_primera_vez': mi_intento['es_primera_vez'],
+                'resultado': {
+                    'acierto': mi_intento['acierto'],
+                    'intentos': mi_intento['intentos_necesarios'],
+                    'texto_intentos': texto_intentos,
+                    'primera_vez': mi_intento['created_at'].isoformat() if mi_intento['created_at'] else None,
+                    'ultima_vez': mi_intento['updated_at'].isoformat() if mi_intento['updated_at'] else None
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'ya_jugo': False,
+                'veces_jugado': 0,
+                'es_primera_vez': True,
+                'resultado': None
+            })
+            
+    except Exception as e:
+        print(f"Error mi intento álbum: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+        
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
