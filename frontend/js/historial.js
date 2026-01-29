@@ -1,7 +1,6 @@
 // Configuración
 const API_BASE = window.location.origin;
 const API_URL = `${API_BASE}/api`;
-
 // Elementos DOM
 const botonesGrid = document.getElementById('botones-grid');
 const cargandoElement = document.getElementById('cargando');
@@ -18,12 +17,13 @@ const btnJugar = document.getElementById('btn-jugar-historial');
 let albumes = [];
 //let albumSeleccionado = null;
 // ⚠️ CAMBIA ESTA FECHA a cuando empezó TU álbum
-const FECHA_INICIO = '2026-01-25';
+const FECHA_INICIO = '2026-01-26';
 // Función para filtrar álbumes que YA HAN PASADO (fecha <= hoy)
+
 function filtrarAlbumesPasados(albumes) {
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0); // Poner a medianoche para comparar solo fechas
-
+    hoy.setMonth(hoy.getMonth()); // ← 4 meses en el futuro
+    hoy.setHours(0, 0, 0, 0);
     return albumes.filter(album => {
         try {
             const fechaAlbum = new Date(album.fecha_programada);
@@ -102,14 +102,15 @@ function mostrarMensajeSinAlbumes() {
 // Calcular número del día desde fecha
 function calcularNumeroDia(fechaString) {
     try {
-        const fechaAlbum = new Date(fechaString);
-        const inicio = new Date(FECHA_INICIO);
+        // Parsear fechas directamente como YYYY-MM-DD
+        const [yearA, monthA, dayA] = fechaString.split('-').map(Number);
+        const [yearI, monthI, dayI] = FECHA_INICIO.split('-').map(Number);
 
-        fechaAlbum.setHours(0, 0, 0, 0);
-        inicio.setHours(0, 0, 0, 0);
+        // Crear fechas UTC
+        const fechaAlbum = Date.UTC(yearA, monthA - 1, dayA);
+        const inicio = Date.UTC(yearI, monthI - 1, dayI);
 
-        const diferenciaMs = fechaAlbum.getTime() - inicio.getTime();
-        const diferenciaDias = Math.floor(diferenciaMs / (1000 * 3600 * 24));
+        const diferenciaDias = Math.floor((fechaAlbum - inicio) / (1000 * 3600 * 24));
 
         return Math.max(1, diferenciaDias + 1);
     } catch (error) {
@@ -140,10 +141,8 @@ function crearBotones() {
 
         boton.innerHTML = `
             <div class="numero-dia">${numeroDia}</div>
-            <div class="texto-dia">Día ${numeroDia}</div>
         `;
 
-        // ¡DIRECTO AL JUEGO! No más panel de información
         boton.addEventListener('click', () => {
             console.log(`🎮 Seleccionado Álbum #${numeroDia} (${album.fecha_programada})`);
             jugarAlbum(album.fecha_programada, numeroDia);
@@ -152,14 +151,19 @@ function crearBotones() {
         botonesGrid.appendChild(boton);
     });
 
-    // Ya no seleccionamos el primer álbum por defecto
-    // porque vamos directo al juego con cada clic
 }
 
 // Verificar si es el día de hoy
 function esDiaDeHoy(fecha) {
     const hoy = new Date().toISOString().split('T')[0];
     const fechaAlbum = new Date(fecha).toISOString().split('T')[0];
+
+    // Imprimir ambos valores
+    console.log("🔍 Debug esDiaDeHoy:");
+    console.log("hoy:", hoy);
+    console.log("fechaAlbum:", fechaAlbum);
+    console.log("¿Son iguales?", hoy === fechaAlbum);
+
     return hoy === fechaAlbum;
 }
 
@@ -179,7 +183,7 @@ function crearDatosEjemplo() {
 
     // Calcular días desde inicio
     const diasDesdeInicio = Math.floor((hoy - fechaInicioObj) / (1000 * 3600 * 24));
-    const totalDias = Math.max(30, diasDesdeInicio + 1);
+    const totalDias = Math.max(275, diasDesdeInicio + 1);
 
     for (let i = 0; i < totalDias; i++) {
         const fecha = new Date(fechaInicioObj);

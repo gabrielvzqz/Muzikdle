@@ -80,6 +80,107 @@ def get_imagen_del_dia():
             'message': f'Error: {str(e)}'
         }), 500
 
+@app.route('/api/todos-titulos-y-descripciones', methods=['GET'])
+def get_todos_titulos_y_descripciones():
+    try:
+        # Obtener títulos únicos
+        query_titulos = """
+        SELECT DISTINCT titulo 
+        FROM imagenes 
+        WHERE activa = TRUE 
+          AND titulo IS NOT NULL 
+          AND titulo != ''
+          AND LENGTH(titulo) > 1
+        ORDER BY titulo
+        """
+        
+        # Obtener pares (descripción → título) para búsqueda
+        query_descripciones = """
+        SELECT DISTINCT 
+            descripcion,
+            titulo
+        FROM imagenes 
+        WHERE activa = TRUE 
+          AND descripcion IS NOT NULL 
+          AND descripcion != '' 
+          AND LENGTH(descripcion) > 1
+          AND descripcion NOT LIKE '%http%'
+          AND descripcion NOT LIKE '%.jpg%'
+          AND descripcion NOT LIKE '%.png%'
+          AND descripcion NOT LIKE '%.jpeg%'
+          AND descripcion NOT LIKE '%.gif%'
+          AND descripcion NOT REGEXP '^[0-9]+$'
+        ORDER BY descripcion
+        """
+
+        from database import Database
+        db = Database()
+        db.connect()
+        cursor = db.connection.cursor(dictionary=True)
+        
+        # Ejecutar consulta de títulos
+        cursor.execute(query_titulos)
+        titulos_result = cursor.fetchall()
+        
+        # Ejecutar consulta de descripciones
+        cursor.execute(query_descripciones)
+        descripciones_result = cursor.fetchall()
+        
+        cursor.close()
+        db.connection.close()
+
+        # Preparar respuesta
+        resultados = {
+            'titulos': [],
+            'descripciones_titulos': []  # Pares para búsqueda
+        }
+        
+        # Agregar títulos directos
+        if titulos_result:
+            resultados['titulos'] = [row['titulo'].strip() for row in titulos_result if row['titulo']]
+        
+        # Agregar pares descripción → título
+        if descripciones_result:
+            for row in descripciones_result:
+                if row['descripcion'] and row['titulo']:
+                    resultados['descripciones_titulos'].append({
+                        'descripcion': row['descripcion'].strip(),
+                        'titulo': row['titulo'].strip()
+                    })
+        
+        # Eliminar duplicados en títulos
+        titulos_unicos = []
+        titulos_vistos = set()
+        for titulo in resultados['titulos']:
+            titulo_lower = titulo.lower()
+            if titulo_lower not in titulos_vistos:
+                titulos_vistos.add(titulo_lower)
+                titulos_unicos.append(titulo)
+        
+        return jsonify({
+            'success': True,
+            'titulos': titulos_unicos,
+            'descripciones_titulos': resultados['descripciones_titulos'],
+            'total_titulos': len(titulos_unicos),
+            'total_descripciones': len(resultados['descripciones_titulos'])
+        })
+
+    except Exception as e:
+        print(f"Error en todos-titulos-y-descripciones: {str(e)}")
+        
+        return jsonify({
+            'success': True,
+            'titulos': [
+                "Lindo M El Indomable",
+                "La Vendicion Vol. 2 Summer Edition",
+                "Freemolly",
+                "HyperPopular"
+            ],
+            'descripciones_titulos': [],
+            'total_titulos': 4,
+            'total_descripciones': 0,
+            'mensaje': 'Usando datos de respaldo'
+        })
 # Ruta para subir nuevas imágenes
 @app.route('/api/subir-imagen', methods=['POST'])
 def subir_imagen():
