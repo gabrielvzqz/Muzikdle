@@ -21,20 +21,18 @@ const FECHA_INICIO = '2026-01-26';
 // Función para filtrar álbumes que YA HAN PASADO (fecha <= hoy)
 
 function filtrarAlbumesPasados(albumes) {
-    const hoy = new Date();
-    hoy.setMonth(hoy.getMonth()); // ← 4 meses en el futuro
-    hoy.setHours(0, 0, 0, 0);
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1); // Ayer
+    ayer.setHours(0, 0, 0, 0);
+
     return albumes.filter(album => {
         try {
             const fechaAlbum = new Date(album.fecha_programada);
             fechaAlbum.setHours(0, 0, 0, 0);
-
-            // Solo incluir si la fecha es HOY o ANTERIOR
-            return fechaAlbum <= hoy;
-
+            return fechaAlbum <= ayer;
         } catch (error) {
             console.error('Error filtrando álbum:', album, error);
-            return false; // Excluir si hay error
+            return false;
         }
     });
 }
@@ -61,43 +59,25 @@ async function cargarHistorial() {
             // 2. FILTRAR: Solo álbumes que YA HAN PASADO (fecha <= hoy)
             albumes = filtrarAlbumesPasados(albumesOrdenados);
 
-            console.log(`📊 Total álbumes: ${data.albumes.length}`);
-            console.log(`✅ Álbumes pasados: ${albumes.length}`);
 
             if (albumes.length > 0) {
-                console.log(`📅 Fechas disponibles: ${albumes.map(a => a.fecha_programada).join(', ')}`);
                 crearBotones();
             } else {
-                console.log('ℹ️ No hay álbumes pasados todavía');
                 mostrarMensajeSinAlbumes();
             }
 
         } else {
-            console.warn('⚠️ No hay álbumes, usando datos de ejemplo');
-            crearDatosEjemplo();
+            mostrarMensajeSinAlbumes();
         }
 
     } catch (error) {
         console.error('❌ Error cargando historial:', error);
-        crearDatosEjemplo();
+        mostrarErrorCarga();
     } finally {
         cargandoElement.style.display = 'none';
     }
 }
 
-// Función para mostrar mensaje cuando no hay álbumes pasados
-function mostrarMensajeSinAlbumes() {
-    sinAlbumesElement.innerHTML = `
-        <p>🎉 ¡Bienvenido al Álbum del Día!</p>
-        <p>Este es el primer día del juego.</p>
-        <p>Los álbumes históricos aparecerán aquí a medida que avancen los días.</p>
-        <a href="index.html" class="btn-volver" style="margin-top: 1rem; display: inline-block;">
-            ← Jugar al álbum de hoy
-        </a>
-    `;
-    sinAlbumesElement.style.display = 'block';
-    botonesGrid.style.display = 'none';
-}
 
 // Calcular número del día desde fecha
 function calcularNumeroDia(fechaString) {
@@ -132,10 +112,9 @@ function crearBotones() {
 
     albumes.forEach((album, index) => {
         const numeroDia = calcularNumeroDia(album.fecha_programada);
-        const esDiaActual = esDiaDeHoy(album.fecha_programada);
 
         const boton = document.createElement('button');
-        boton.className = `btn-dia ${esDiaActual ? 'actual' : ''}`;
+        boton.className = 'btn-dia';
         boton.dataset.fecha = album.fecha_programada;
         boton.dataset.numero = numeroDia;
 
@@ -144,7 +123,6 @@ function crearBotones() {
         `;
 
         boton.addEventListener('click', () => {
-            console.log(`🎮 Seleccionado Álbum #${numeroDia} (${album.fecha_programada})`);
             jugarAlbum(album.fecha_programada, numeroDia);
         });
 
@@ -153,51 +131,13 @@ function crearBotones() {
 
 }
 
-// Verificar si es el día de hoy
-function esDiaDeHoy(fecha) {
-    const hoy = new Date().toISOString().split('T')[0];
-    const fechaAlbum = new Date(fecha).toISOString().split('T')[0];
 
-    // Imprimir ambos valores
-    console.log("🔍 Debug esDiaDeHoy:");
-    console.log("hoy:", hoy);
-    console.log("fechaAlbum:", fechaAlbum);
-    console.log("¿Son iguales?", hoy === fechaAlbum);
-
-    return hoy === fechaAlbum;
-}
 
 // Ir directamente al álbum seleccionado
 function jugarAlbum(fecha, numeroDia) {
-    console.log(`🚀 Redirigiendo a Álbum #${numeroDia} (${fecha})`);
 
     // Usar solo parámetros URL (más limpio)
     window.location.href = `index.html?album=${fecha}&dia=${numeroDia}`;
-}
-
-// Datos de ejemplo
-function crearDatosEjemplo() {
-    albumes = [];
-    const hoy = new Date();
-    const fechaInicioObj = new Date(FECHA_INICIO);
-
-    // Calcular días desde inicio
-    const diasDesdeInicio = Math.floor((hoy - fechaInicioObj) / (1000 * 3600 * 24));
-    const totalDias = Math.max(275, diasDesdeInicio + 1);
-
-    for (let i = 0; i < totalDias; i++) {
-        const fecha = new Date(fechaInicioObj);
-        fecha.setDate(fecha.getDate() + i);
-
-        albumes.push({
-            fecha_programada: fecha.toISOString().split('T')[0],
-            total_imagenes: 6,
-            completado: true
-        });
-    }
-
-    console.log(`📊 ${albumes.length} álbumes de ejemplo creados`);
-    crearBotones();
 }
 
 // Inicializar
