@@ -8,7 +8,7 @@ from models import ImagenModel
 import uuid
 
 app = Flask(__name__)
-app.secret_key = 'clave_secreta_para_desarrollo' 
+app.secret_key = Config.SECRET_KEY
 
 CORS(app, resources={
     r"/api/*": {
