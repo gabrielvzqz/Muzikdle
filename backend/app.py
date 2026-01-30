@@ -29,15 +29,63 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Instancia del modelo
 imagen_model = ImagenModel()
+@app.route('/api/get-user-id', methods=['GET'])
+def api_get_user_id():
+    try:
+        user_id = get_or_create_user_id()
+        print(f"📤 Enviando user_id al frontend: {user_id}")
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'first_visit': session.get('first_visit')
+        })
+    except Exception as e:
+        print(f"Error en get-user-id: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'user_id': 'error_' + str(uuid.uuid4())[:8]
+        }), 500
 
 def get_or_create_user_id():
     """Genera o recupera un ID único para el usuario"""
-    if 'user_id' not in session:
-        # Generar ID único
-        session['user_id'] = str(uuid.uuid4())[:12]  # ID más corto
+    print("=" * 60)
+    print("🔍 DEBUG get_or_create_user_id()")
+    
+    # PRIMERA prioridad: user_id del frontend (localStorage)
+    user_id_from_frontend = request.headers.get('X-User-ID')
+    
+    print(f"   X-User-ID en headers: {user_id_from_frontend}")
+    
+    # Si el frontend envía un user_id, USAR ESE SIEMPRE
+    if user_id_from_frontend:
+        print(f"   ✅ USER ID DEL FRONTEND (localStorage): {user_id_from_frontend}")
+        
+        # Guardar en sesión por compatibilidad
+        session['user_id'] = user_id_from_frontend
+        
+        # Registrar primera visita si no existe
+        if 'first_visit' not in session:
+            session['first_visit'] = datetime.now().isoformat()
+            print(f"   📅 Primera visita registrada: {session['first_visit']}")
+        
+        print(f"   🎯 User ID final (usando frontend): {user_id_from_frontend}")
+        print("=" * 60)
+        return user_id_from_frontend
+    
+    # Si no hay user_id del frontend (primera carga sin JS ejecutado)
+    # Usar sesión existente o crear nueva
+    if 'user_id' in session:
+        print(f"   🔄 Usando sesión existente: {session['user_id']}")
+        return session['user_id']
+    else:
+        # Crear nuevo user_id temporal
+        nuevo_id = str(uuid.uuid4())[:12]
+        session['user_id'] = nuevo_id
         session['first_visit'] = datetime.now().isoformat()
-    return session['user_id']
-
+        print(f"   🔴 NUEVO TEMPORAL (sin frontend): {nuevo_id}")
+        print("=" * 60)
+        return nuevo_id
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
